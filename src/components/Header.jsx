@@ -13,7 +13,7 @@ export default function Header({ onMenu, onProfile, onLogout, profile, user }) {
         <span className="text-xs text-white/55">Sesión activa</span>
       </div>
       <button className="bg-transparent mr-2" onClick={onProfile} aria-label="Perfil">
-        <span className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center font-semibold">{label.charAt(0).toUpperCase()}</span>
+        <span className="w-8 h-8 rounded-full bg-linear-to-br from-cyan-500 to-indigo-600 flex items-center justify-center font-semibold">{label.charAt(0).toUpperCase()}</span>
       </button>
       <button className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-white/80 transition hover:bg-white/5" onClick={onLogout} aria-label="Cerrar sesión">
         Salir
