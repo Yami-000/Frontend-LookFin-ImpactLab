@@ -53,7 +53,27 @@ export default function App() {
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_CONV)
-    if (raw) setConversations(JSON.parse(raw))
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setConversations(parsed)
+        setActiveId(parsed[0].id)
+      } else {
+        // create initial conversation with welcome message
+        const id = Date.now().toString()
+        const botMsg = { id: Date.now().toString() + '-bot', from: 'bot', text: '¡Hola! Soy LookFin, tu asistente financiero personal. ¿En qué puedo ayudarte hoy?', time: Date.now() }
+        const conv = { id, title: 'Bienvenido', messages: [botMsg] }
+        setConversations([conv])
+        setActiveId(id)
+      }
+    } else {
+      // no stored conversations -> create initial one
+      const id = Date.now().toString()
+      const botMsg = { id: Date.now().toString() + '-bot', from: 'bot', text: '¡Hola! Soy LookFin, tu asistente financiero personal. ¿En qué puedo ayudarte hoy?', time: Date.now() }
+      const conv = { id, title: 'Bienvenido', messages: [botMsg] }
+      setConversations([conv])
+      setActiveId(id)
+    }
     const p = localStorage.getItem(STORAGE_PROFILE)
     if (p) setProfile(JSON.parse(p))
   }, [])
@@ -77,7 +97,8 @@ export default function App() {
 
   const addConversation = (title) => {
     const id = Date.now().toString()
-    const conv = { id, title: title || 'Nueva conversación', messages: [] }
+    const botMsg = { id: Date.now().toString() + '-bot', from: 'bot', text: '¡Hola! Soy LookFin, tu asistente financiero personal. ¿En qué puedo ayudarte hoy?', time: Date.now() }
+    const conv = { id, title: title || 'Nueva conversación', messages: [botMsg] }
     setConversations((s) => [conv, ...s])
     setActiveId(id)
     setSidebarOpen(false)
