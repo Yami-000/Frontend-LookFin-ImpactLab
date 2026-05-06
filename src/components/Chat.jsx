@@ -27,18 +27,22 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
       {!conversation ? (
         <div className="flex-1 flex items-center justify-center text-white/60">Selecciona o crea una conversación desde la izquierda.</div>
       ) : (
-        <div className="flex-1 p-3 overflow-auto space-y-3">
-          {conversation.messages.map((m) => (
-            <div key={m.id} className={`max-w-[60%] p-2 rounded ${m.from === 'user' ? 'bg-indigo-700 ml-auto' : 'bg-white/5'}`}>
-              <div className="text-sm">{m.text}</div>
-            </div>
-          ))}
+        <div className="flex-1 p-4 overflow-auto space-y-4">
+          <div className="max-w-4xl mx-auto">
+            {conversation.messages.map((m) => (
+              <div key={m.id} className={`max-w-[60%] p-3 rounded-xl ${m.from === 'user' ? 'bg-indigo-700 ml-auto text-white' : 'bg-white/5 text-white'}`}>
+                <div className="text-sm">{m.text}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="flex p-3 border-t border-white/5">
-        <input className="flex-1 p-2 rounded bg-transparent border border-white/5 mr-2" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Escribe tu mensaje..." />
-        <button className="px-3 py-2 bg-indigo-600 rounded" onClick={send}>Enviar</button>
+      <div className="p-4 border-t border-white/5 bg-[#050816]/40 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto flex">
+          <input className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-slate-500" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Escribe tu mensaje..." />
+          <button className="ml-3 px-4 py-3 rounded-2xl bg-linear-to-r from-cyan-500 to-indigo-600 text-white shadow-lg shadow-cyan-500/20" onClick={send}>Enviar</button>
+        </div>
       </div>
     </main>
   )

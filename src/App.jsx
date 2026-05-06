@@ -102,7 +102,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#050816]">
       <Header
         onMenu={() => setSidebarOpen((s) => !s)}
         onProfile={() => setProfileOpen(true)}
