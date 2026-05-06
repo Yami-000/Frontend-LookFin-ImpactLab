@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { auth } from './lib/firebase.js'
+import Login from './views/Login.tsx'
 import Header from './components/Header'
 import Sidebar from './components/Sidebar'
 import Chat from './components/Chat'
@@ -8,11 +11,45 @@ const STORAGE_CONV = 'lf_conversations'
 const STORAGE_PROFILE = 'lf_profile'
 
 export default function App() {
+  const [authReady, setAuthReady] = useState(false)
+  const [authUser, setAuthUser] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [conversations, setConversations] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [profile, setProfile] = useState({ name: 'Usuario', bio: '' })
+
+  useEffect(() => {
+    if (!auth) {
+      setAuthReady(true)
+      return undefined
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setAuthUser(user)
+
+      if (user) {
+        const token = await user.getIdToken()
+        localStorage.setItem('lf_firebase_token', token)
+        localStorage.setItem(
+          'lf_firebase_user',
+          JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+          }),
+        )
+      } else {
+        localStorage.removeItem('lf_firebase_token')
+        localStorage.removeItem('lf_firebase_user')
+      }
+
+      setAuthReady(true)
+    })
+
+    return () => unsubscribe()
+  }, [])
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_CONV)
@@ -29,6 +66,15 @@ export default function App() {
     localStorage.setItem(STORAGE_PROFILE, JSON.stringify(profile))
   }, [profile])
 
+  const handleLogout = async () => {
+    if (!auth) return
+
+    await signOut(auth)
+    setSidebarOpen(false)
+    setProfileOpen(false)
+    setActiveId(null)
+  }
+
   const addConversation = (title) => {
     const id = Date.now().toString()
     const conv = { id, title: title || 'Nueva conversación', messages: [] }
@@ -43,9 +89,27 @@ export default function App() {
 
   const activeConv = conversations.find((c) => c.id === activeId) || null
 
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#050816] text-slate-300">
+        Cargando LookFin...
+      </div>
+    )
+  }
+
+  if (!authUser) {
+    return <Login onAuthenticated={(user) => setAuthUser(user)} />
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
-      <Header onMenu={() => setSidebarOpen((s) => !s)} onProfile={() => setProfileOpen(true)} profile={profile} />
+      <Header
+        onMenu={() => setSidebarOpen((s) => !s)}
+        onProfile={() => setProfileOpen(true)}
+        onLogout={handleLogout}
+        profile={profile}
+        user={authUser}
+      />
 
       <div className="flex-1 relative flex">
         <Sidebar open={sidebarOpen} conversations={conversations} onCreate={() => addConversation()} onSelect={(id) => setActiveId(id)} onClose={() => setSidebarOpen(false)} />
