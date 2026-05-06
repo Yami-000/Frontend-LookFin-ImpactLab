@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { gql } from '@apollo/client'
+import { useMutation } from '@apollo/client/react'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { auth } from './lib/firebase.js'
 import Login from './views/Login.tsx'
@@ -6,6 +8,15 @@ import Header from './components/Header'
 import Sidebar from './components/Sidebar'
 import Chat from './components/Chat'
 import ProfileModal from './components/ProfileModal'
+
+const ADD_CHAT = gql`
+  mutation AddChat($input: ChatInput!) {
+    addChat(input: $input) {
+      id
+      nombre
+    }
+  }
+`;
 
 const STORAGE_CONV = 'lf_conversations'
 const STORAGE_PROFILE = 'lf_profile'
@@ -18,6 +29,7 @@ export default function App() {
   const [conversations, setConversations] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [profile, setProfile] = useState({ name: 'Usuario', bio: '' })
+  const [addChatMutation] = useMutation(ADD_CHAT)
 
   useEffect(() => {
     if (!auth) {
@@ -75,12 +87,40 @@ export default function App() {
     setActiveId(null)
   }
 
-  const addConversation = (title) => {
-    const id = Date.now().toString()
-    const conv = { id, title: title || 'Nueva conversación', messages: [] }
-    setConversations((s) => [conv, ...s])
-    setActiveId(id)
+  const addConversation = async (title, existingConversationId = null) => {
+    const response = await addChatMutation({
+      variables: {
+        input: {
+          nombre: title || 'Nueva conversación',
+        },
+      },
+    })
+
+    const createdChat = response.data?.addChat
+    if (!createdChat?.id) {
+      throw new Error('No se pudo crear la conversación en la base de datos')
+    }
+
+    setConversations((current) => {
+      if (existingConversationId) {
+        return current.map((conversation) => (
+          conversation.id === existingConversationId
+            ? { ...conversation, id: createdChat.id, title: createdChat.nombre || conversation.title }
+            : conversation
+        ))
+      }
+
+      const conv = { id: createdChat.id, title: createdChat.nombre || title || 'Nueva conversación', messages: [] }
+      return [conv, ...current]
+    })
+
+    setActiveId(createdChat.id)
     setSidebarOpen(false)
+
+    return {
+      id: createdChat.id,
+      title: createdChat.nombre || title || 'Nueva conversación',
+    }
   }
 
   const updateConversation = (id, messages) => {
@@ -111,7 +151,7 @@ export default function App() {
         user={authUser}
       />
 
-      <div className="flex-1 relative flex">
+      <div className="flex-1 relative flex bg-gray-900">
         <Sidebar open={sidebarOpen} conversations={conversations} onCreate={() => addConversation()} onSelect={(id) => setActiveId(id)} onClose={() => setSidebarOpen(false)} />
         <Chat conversation={activeConv} onCreateConversation={addConversation} onUpdateConversation={updateConversation} />
       </div>
