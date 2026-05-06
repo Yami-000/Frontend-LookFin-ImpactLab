@@ -1,16 +1,96 @@
 import React, { useMemo, useState } from 'react';
 import {
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  updateProfile,
   type User,
 } from 'firebase/auth';
 import type { FormEvent } from 'react';
+import { gql } from '@apollo/client';
+import { useMutation } from '@apollo/client/react';
 import { auth, missingFirebaseKeys, prepareAuthPersistence } from '../lib/firebase.js';
 
 type LoginProps = {
   onAuthenticated?: (user: User, token: string) => void;
 };
+
+type UsuarioGraphql = {
+  id: string;
+  nombre: string;
+  correoElectronico: string;
+  firebaseUID?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type SignUpEmailPasswordResponse = {
+  signUpEmailPassword?: {
+    success: boolean;
+    message: string;
+    usuario?: UsuarioGraphql | null;
+    firebaseUID?: string | null;
+  } | null;
+};
+
+type LoginEmailPasswordResponse = {
+  loginEmailPassword?: {
+    success: boolean;
+    message: string;
+    usuario?: UsuarioGraphql | null;
+    firebaseUID?: string | null;
+    idToken?: string | null;
+  } | null;
+};
+
+type SignUpEmailPasswordVariables = {
+  input: {
+    nombre: string;
+    correoElectronico: string;
+    contrasena: string;
+  };
+};
+
+type LoginEmailPasswordVariables = {
+  input: {
+    correoElectronico: string;
+    idToken: string;
+  };
+};
+
+const SIGN_UP_EMAIL_PASSWORD = gql`
+  mutation SignUpEmailPassword($input: SignUpEmailPasswordInput!) {
+    signUpEmailPassword(input: $input) {
+      success
+      message
+      usuario {
+        id
+        nombre
+        correoElectronico
+        firebaseUID
+        createdAt
+        updatedAt
+      }
+      firebaseUID
+    }
+  }
+`;
+
+const LOGIN_EMAIL_PASSWORD = gql`
+  mutation LoginEmailPassword($input: LoginEmailPasswordInput!) {
+    loginEmailPassword(input: $input) {
+      success
+      message
+      usuario {
+        id
+        nombre
+        correoElectronico
+        firebaseUID
+        createdAt
+        updatedAt
+      }
+      firebaseUID
+      idToken
+    }
+  }
+`;
 
 const friendlyError = (code?: string) => {
   switch (code) {
@@ -39,6 +119,8 @@ export default function Login({ onAuthenticated }: LoginProps) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [signUpEmailPassword] = useMutation<SignUpEmailPasswordResponse, SignUpEmailPasswordVariables>(SIGN_UP_EMAIL_PASSWORD);
+  const [loginEmailPassword] = useMutation<LoginEmailPasswordResponse, LoginEmailPasswordVariables>(LOGIN_EMAIL_PASSWORD);
 
   const isConfigured = missingFirebaseKeys.length === 0 && Boolean(auth);
 
@@ -70,13 +152,37 @@ export default function Login({ onAuthenticated }: LoginProps) {
       if (mode === 'login') {
         credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
       } else {
-        credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-        if (name.trim()) {
-          await updateProfile(credential.user, { displayName: name.trim() });
+        const signUpResponse = await signUpEmailPassword({
+          variables: {
+            input: {
+              nombre: name.trim(),
+              correoElectronico: email,
+              contrasena: password,
+            },
+          },
+        });
+
+        if (!signUpResponse.data?.signUpEmailPassword?.success) {
+          throw new Error(signUpResponse.data?.signUpEmailPassword?.message || 'No se pudo registrar el usuario.');
         }
+
+        credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
       }
 
       const token = await credential.user.getIdToken();
+      const backendResponse = await loginEmailPassword({
+        variables: {
+          input: {
+            correoElectronico: email,
+            idToken: token,
+          },
+        },
+      });
+
+      if (!backendResponse.data?.loginEmailPassword?.success) {
+        throw new Error(backendResponse.data?.loginEmailPassword?.message || 'No se pudo sincronizar el usuario con la base de datos.');
+      }
+
       localStorage.setItem('lf_firebase_token', token);
       localStorage.setItem(
         'lf_firebase_user',
@@ -89,8 +195,8 @@ export default function Login({ onAuthenticated }: LoginProps) {
 
       onAuthenticated?.(credential.user, token);
     } catch (err: unknown) {
-      const firebaseError = err as { code?: string };
-      setError(friendlyError(firebaseError?.code));
+      const firebaseError = err as { code?: string; message?: string };
+      setError(firebaseError?.code ? friendlyError(firebaseError.code) : firebaseError?.message || 'No se pudo completar la autenticación.');
     } finally {
       setLoading(false);
     }
