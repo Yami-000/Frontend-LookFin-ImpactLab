@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --accent: #4f46e5;
+}
+
+body { @apply bg-gradient-to-b from-[#071029] to-[#081427] text-[#e6eef6] min-h-screen }
