@@ -1,7 +1,10 @@
 import { ApolloClient, InMemoryCache, HttpLink, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 
-const graphqlUri = import.meta.env.VITE_GRAPHQL_URL ?? 'http://localhost:4000/graphql';
+const isProduction = String(import.meta.env.VITE_PRODUCTION ?? 'false').toLowerCase() === 'true';
+const graphqlUri = isProduction
+  ? (import.meta.env.VITE_GRAPHQL ?? import.meta.env.VITE_GRAPHQL_URL ?? 'https://backend-lookfin-impactlab.onrender.com/graphql')
+  : 'http://localhost:4000/graphql';
 
 const httpLink = new HttpLink({
   uri: graphqlUri,
