@@ -108,6 +108,17 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
         return
       }
     }
+      // scroll to bottom whenever messages change
+    useEffect(() => {
+      if (!conversation || !wrapperRef.current) return
+      // small timeout to wait render
+      const t = setTimeout(() => {
+        try {
+          wrapperRef.current.scrollTo({ top: wrapperRef.current.scrollHeight, behavior: 'smooth' })
+        } catch (e) {}
+      }, 50)
+      return () => clearTimeout(t)
+    }, [conversation?.messages?.length])
 
     const userMsg = {
       id: Date.now().toString() + '-u',
