@@ -12,15 +12,25 @@ const UPLOAD_FILE = gql`
   }
 `;
 
-const ADD_MENSAJE = gql`
-  mutation AddMensaje($input: MensajeInput!) {
-    addMensaje(input: $input) {
-      id
-      chatID
-      texto
-      archivoAdjuntoURL
-      createdAt
-      updatedAt
+const PROCESAR_MENSAJE_CON_IA = gql`
+  mutation ProcesarMensajeConIA($input: ProcessMensajeConIAInput!) {
+    procesarMensajeConIA(input: $input) {
+      mensajeUsuario {
+        id
+        chatID
+        texto
+        usuario {
+          id
+          nombre
+        }
+        createdAt
+      }
+      mensajeIA {
+        id
+        chatID
+        texto
+        createdAt
+      }
     }
   }
 `;
@@ -32,10 +42,11 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
   const [input, setInput] = useState('')
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [processingIA, setProcessingIA] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef(null)
   const [uploadFileMutation] = useMutation(UPLOAD_FILE)
-  const [addMensajeMutation] = useMutation(ADD_MENSAJE)
+  const [procesarMensajeConIAMutation] = useMutation(PROCESAR_MENSAJE_CON_IA)
   const wrapperRef = useRef(null)
 
   const handleFileSelect = (e) => {
@@ -150,49 +161,34 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
     
 
     try {
-      const userMessageResponse = await addMensajeMutation({
+      setProcessingIA(true)
+      const response = await procesarMensajeConIAMutation({
         variables: {
           input: {
             chatID: targetConversationId,
             texto: normalizedText,
-            ...(fileUrl ? { archivoAdjuntoURL: fileUrl } : {}),
           },
         },
       })
 
-      const savedUserMessage = userMessageResponse?.data?.addMensaje
-      if (!savedUserMessage?.id) {
-        throw new Error('No se pudo guardar el mensaje del usuario en la base de datos')
-      }
-
-      const botText = `Respuesta automática: Gracias por tu mensaje. (Eco: ${normalizedText || 'Archivo adjunto'})`
-      const botMessageResponse = await addMensajeMutation({
-        variables: {
-          input: {
-            chatID: targetConversationId,
-            texto: botText,
-          },
-        },
-      })
-
-      const savedBotMessage = botMessageResponse?.data?.addMensaje
-      if (!savedBotMessage?.id) {
-        throw new Error('No se pudo guardar la respuesta automática en la base de datos')
+      const { mensajeUsuario, mensajeIA } = response?.data?.procesarMensajeConIA
+      if (!mensajeUsuario?.id || !mensajeIA?.id) {
+        throw new Error('No se pudo procesar el mensaje con el agente de IA')
       }
 
       const userMsg = {
-        id: savedUserMessage.id,
+        id: mensajeUsuario.id,
         from: 'user',
-        text: savedUserMessage.texto,
-        time: new Date(savedUserMessage.createdAt || Date.now()).getTime(),
-        archivoAdjuntoURL: savedUserMessage.archivoAdjuntoURL || null,
+        text: mensajeUsuario.texto,
+        time: new Date(mensajeUsuario.createdAt || Date.now()).getTime(),
+        archivoAdjuntoURL: fileUrl || null,
       }
 
       const botMsg = {
-        id: savedBotMessage.id,
+        id: mensajeIA.id,
         from: 'bot',
-        text: savedBotMessage.texto,
-        time: new Date(savedBotMessage.createdAt || Date.now()).getTime(),
+        text: mensajeIA.texto,
+        time: new Date(mensajeIA.createdAt || Date.now()).getTime(),
       }
 
       const newMessages = [...existingMessages, userMsg, botMsg]
@@ -203,6 +199,7 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
       setUploadError(error.message || 'No se pudo guardar el mensaje')
     } finally {
       setUploading(false)
+      setProcessingIA(false)
     }
   }
 
@@ -239,6 +236,17 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
                   )}
                 </div>
               ))}
+              
+              {processingIA && (
+                <div className="max-w-[60%] p-4 rounded-xl my-4 bg-white/5 text-white flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                    <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                  <span className="text-sm text-cyan-300">LookFin está escribiendo...</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -270,11 +278,11 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
             type="file"
             onChange={handleFileSelect}
             className="hidden"
-            disabled={uploading}
+            disabled={uploading || processingIA}
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
+            disabled={uploading || processingIA}
             className="mr-3 px-4 py-3 rounded-2xl bg-[#155DFC] text-white shadow-lg shadow-cyan-500/20 hover:brightness-200 transition disabled:opacity-50"
             title="Adjuntar archivo"
           >
@@ -293,7 +301,7 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
             </svg>
           </button>
           <input
-            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-white outline-none placeholder:text-slate-500"
+            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-white outline-none placeholder:text-slate-500 disabled:opacity-50"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -303,12 +311,13 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
               }
             }}
             placeholder="Escribe tu mensaje..."
-            disabled={uploading}
+            disabled={uploading || processingIA}
           />
           {/* Botón de enviar mensaje */}
           <button
-            className="ml-3 px-4 py-3 rounded-2xl bg-[#155DFC] text-white shadow-lg shadow-cyan-500/20 hover:brightness-200 transition"
+            className="ml-3 px-4 py-3 rounded-2xl bg-[#155DFC] text-white shadow-lg shadow-cyan-500/20 hover:brightness-200 transition disabled:opacity-50"
             onClick={send}
+            disabled={uploading || processingIA}
             aria-label="Enviar"
             title="Enviar"
           >
