@@ -12,6 +12,19 @@ const UPLOAD_FILE = gql`
   }
 `;
 
+const ADD_MENSAJE = gql`
+  mutation AddMensaje($input: MensajeInput!) {
+    addMensaje(input: $input) {
+      id
+      chatID
+      texto
+      archivoAdjuntoURL
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
 const MAX_UPLOAD_FILE_SIZE_BYTES = 8 * 1024 * 1024
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -22,6 +35,7 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
   const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef(null)
   const [uploadFileMutation] = useMutation(UPLOAD_FILE)
+  const [addMensajeMutation] = useMutation(ADD_MENSAJE)
   const wrapperRef = useRef(null)
 
   const handleFileSelect = (e) => {
@@ -64,35 +78,47 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
 
   const send = async () => {
     if (!input.trim() && !selectedFile) return
+    setUploadError('')
 
-    if (!conversation) {
-      await onCreateConversation('Chat ' + new Date().toLocaleString())
-      setInput('')
-      clearFileSelection()
-      return
+    const normalizedText = input.trim()
+
+    let targetConversationId = conversation?.id ?? null
+    let existingMessages = conversation?.messages ?? []
+
+    if (!targetConversationId) {
+      const createdConversation = await onCreateConversation('Chat ' + new Date().toLocaleString())
+      if (!createdConversation?.id) {
+        setUploadError('No se pudo crear la conversación para enviar el mensaje')
+        return
+      }
+      targetConversationId = createdConversation.id
+      existingMessages = []
+    }
+
+    if (!UUID_PATTERN.test(targetConversationId)) {
+      try {
+        const createdConversation = await onCreateConversation(
+          conversation?.title || 'Nueva conversación',
+          conversation?.id || null,
+        )
+
+        if (!createdConversation?.id || !UUID_PATTERN.test(createdConversation.id)) {
+          throw new Error('No se pudo preparar la conversación para enviar mensajes')
+        }
+
+        targetConversationId = createdConversation.id
+      } catch (error) {
+        setUploadError(error.message || 'No se pudo preparar la conversación para enviar mensajes')
+        return
+      }
     }
 
     let fileUrl = null
-    let targetConversationId = conversation.id
 
     if (selectedFile) {
       if (selectedFile.size > MAX_UPLOAD_FILE_SIZE_BYTES) {
         setUploadError('El archivo supera el límite de 8 MB.')
         return
-      }
-
-      if (!UUID_PATTERN.test(conversation.id)) {
-        try {
-          const createdConversation = await onCreateConversation(conversation.title)
-          if (!createdConversation?.id || !UUID_PATTERN.test(createdConversation.id)) {
-            throw new Error('No se pudo preparar la conversación para subir archivos')
-          }
-
-          targetConversationId = createdConversation.id
-        } catch (error) {
-          setUploadError(error.message || 'No se pudo preparar la conversación para subir archivos')
-          return
-        }
       }
 
       setUploading(true)
@@ -123,24 +149,61 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
       // scroll to bottom whenever messages change
     
 
-    const userMsg = {
-      id: Date.now().toString() + '-u',
-      from: 'user',
-      text: input,
-      time: Date.now(),
-      archivoAdjuntoURL: fileUrl,
+    try {
+      const userMessageResponse = await addMensajeMutation({
+        variables: {
+          input: {
+            chatID: targetConversationId,
+            texto: normalizedText,
+            ...(fileUrl ? { archivoAdjuntoURL: fileUrl } : {}),
+          },
+        },
+      })
+
+      const savedUserMessage = userMessageResponse?.data?.addMensaje
+      if (!savedUserMessage?.id) {
+        throw new Error('No se pudo guardar el mensaje del usuario en la base de datos')
+      }
+
+      const botText = `Respuesta automática: Gracias por tu mensaje. (Eco: ${normalizedText || 'Archivo adjunto'})`
+      const botMessageResponse = await addMensajeMutation({
+        variables: {
+          input: {
+            chatID: targetConversationId,
+            texto: botText,
+          },
+        },
+      })
+
+      const savedBotMessage = botMessageResponse?.data?.addMensaje
+      if (!savedBotMessage?.id) {
+        throw new Error('No se pudo guardar la respuesta automática en la base de datos')
+      }
+
+      const userMsg = {
+        id: savedUserMessage.id,
+        from: 'user',
+        text: savedUserMessage.texto,
+        time: new Date(savedUserMessage.createdAt || Date.now()).getTime(),
+        archivoAdjuntoURL: savedUserMessage.archivoAdjuntoURL || null,
+      }
+
+      const botMsg = {
+        id: savedBotMessage.id,
+        from: 'bot',
+        text: savedBotMessage.texto,
+        time: new Date(savedBotMessage.createdAt || Date.now()).getTime(),
+      }
+
+      const newMessages = [...existingMessages, userMsg, botMsg]
+      onUpdateConversation(targetConversationId, newMessages)
+      setInput('')
+      clearFileSelection()
+    } catch (error) {
+      setUploadError(error.message || 'No se pudo guardar el mensaje')
+    } finally {
+      setUploading(false)
     }
-    const botMsg = {
-      id: Date.now().toString() + '-bot',
-      from: 'bot',
-      text: `Respuesta automática: Gracias por tu mensaje. (Eco: ${input})`,
-      time: Date.now(),
-    }
-    const newMessages = [...conversation.messages, userMsg, botMsg]
-    onUpdateConversation(targetConversationId, newMessages)
-    setInput('')
-    clearFileSelection()
-    setUploading(false)
   }
 
   return (
@@ -162,6 +225,18 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
               {conversation.messages.map((m) => (
                 <div key={m.id} className={`max-w-[60%] p-4 rounded-xl my-4 ${m.from === 'user' ? 'bg-indigo-700 ml-auto text-white' : 'bg-white/5 text-white'}`}>
                   <div className="text-sm">{m.text}</div>
+                  {m.archivoAdjuntoURL && (
+                    <div className="mt-2">
+                      <a
+                        href={m.archivoAdjuntoURL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-cyan-300 underline break-all"
+                      >
+                        Ver archivo adjunto
+                      </a>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
