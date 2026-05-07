@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { gql } from '@apollo/client'
 import { useMutation } from '@apollo/client/react'
+import ReactMarkdown from 'react-markdown'
 
 const UPLOAD_FILE = gql`
   mutation UploadFile($input: UploadFileInput!) {
@@ -221,7 +222,24 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
             <div className="w-full">
               {conversation.messages.map((m) => (
                 <div key={m.id} className={`max-w-[60%] p-4 rounded-xl my-4 ${m.from === 'user' ? 'bg-indigo-700 ml-auto text-white' : 'bg-white/5 text-white'}`}>
-                  <div className="text-sm">{m.text}</div>
+                  <div className="text-sm prose prose-invert max-w-none">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="m-0 mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        code: ({ children }) => <code className="bg-black/30 px-2 py-1 rounded text-xs">{children}</code>,
+                        pre: ({ children }) => <pre className="bg-black/30 p-2 rounded mb-2 overflow-x-auto">{children}</pre>,
+                        strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                        em: ({ children }) => <em className="italic">{children}</em>,
+                        a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">{children}</a>,
+                        blockquote: ({ children }) => <blockquote className="border-l-4 border-cyan-400 pl-4 italic my-2">{children}</blockquote>,
+                      }}
+                    >
+                      {m.text}
+                    </ReactMarkdown>
+                  </div>
                   {m.archivoAdjuntoURL && (
                     <div className="mt-2">
                       <a
