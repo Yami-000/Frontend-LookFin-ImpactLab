@@ -171,7 +171,7 @@ export default function App() {
         user={authUser}
       />
 
-      <div className="flex-1 relative flex bg-gray-900">
+      <div className="flex-1 relative flex">
         <Sidebar open={sidebarOpen} conversations={conversations} onCreate={() => addConversation()} onSelect={(id) => setActiveId(id)} onClose={() => setSidebarOpen(false)} />
         <Chat conversation={activeConv} onCreateConversation={addConversation} onUpdateConversation={updateConversation} />
       </div>

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { gql } from '@apollo/client'
 import { useMutation } from '@apollo/client/react'
 
@@ -22,6 +22,7 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
   const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef(null)
   const [uploadFileMutation] = useMutation(UPLOAD_FILE)
+  const wrapperRef = useRef(null)
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0]
@@ -49,6 +50,17 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
       reader.readAsDataURL(file)
     })
   }
+
+  useEffect(() => {
+    if (!conversation || !wrapperRef.current) return
+    // small timeout to wait render
+    const t = setTimeout(() => {
+      try {
+        wrapperRef.current.scrollTo({ top: wrapperRef.current.scrollHeight, behavior: 'smooth' })
+      } catch (e) {}
+    }, 50)
+    return () => clearTimeout(t)
+  }, [conversation?.messages?.length])
 
   const send = async () => {
     if (!input.trim() && !selectedFile) return
@@ -109,16 +121,7 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
       }
     }
       // scroll to bottom whenever messages change
-    useEffect(() => {
-      if (!conversation || !wrapperRef.current) return
-      // small timeout to wait render
-      const t = setTimeout(() => {
-        try {
-          wrapperRef.current.scrollTo({ top: wrapperRef.current.scrollHeight, behavior: 'smooth' })
-        } catch (e) {}
-      }, 50)
-      return () => clearTimeout(t)
-    }, [conversation?.messages?.length])
+    
 
     const userMsg = {
       id: Date.now().toString() + '-u',
@@ -145,28 +148,28 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
       {!conversation ? (
         <div className="flex-1 flex items-center justify-center text-white/60">Selecciona o crea una conversación desde la izquierda.</div>
       ) : (
-        <div className="flex-1 p-3 overflow-auto space-y-3">
-          {conversation.messages.map((m) => (
-            <div key={m.id} className={`max-w-[60%] p-3 rounded ${m.from === 'user' ? 'bg-indigo-700 ml-auto' : 'bg-white/5'}`}>
-              {m.text && <div className="text-sm">{m.text}</div>}
-              {m.archivoAdjuntoURL && (
-                <div className="mt-2">
-                  <a
-                    href={m.archivoAdjuntoURL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-cyan-300 underline break-all"
-                  >
-                    📎 Ver archivo adjunto
-                  </a>
+        <div ref={wrapperRef} className="flex-1 p-3 overflow-auto space-y-3">
+          <div className={`max-w-4xl mx-auto min-h-full flex flex-col ${conversation.messages.length === 1 && conversation.messages[0].from === 'bot' ? 'justify-center items-center' : 'justify-start items-stretch'} gap-6`}>
+            {/* Show welcome banner if conversation currently only has the initial bot message */}
+            {conversation.messages.length === 1 && conversation.messages[0].from === 'bot' && (
+              <div className="text-center">
+                <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Bienvenido a LookFin</h2>
+                <p className="mt-3 text-lg text-slate-300">Tu compañero inteligente en finanzas personales</p>
+              </div>
+            )}
+
+            <div className="w-full">
+              {conversation.messages.map((m) => (
+                <div key={m.id} className={`max-w-[60%] p-4 rounded-xl my-4 ${m.from === 'user' ? 'bg-indigo-700 ml-auto text-white' : 'bg-white/5 text-white'}`}>
+                  <div className="text-sm">{m.text}</div>
                 </div>
-              )}
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       )}
 
-      <div className="p-3 border-t border-white/5 space-y-2">
+      <div className="p-6 border-t border-white/5 bg-[#050816]/40 backdrop-blur-sm">
         {selectedFile && (
           <div className="flex items-center gap-2 bg-white/10 p-2 rounded text-sm">
             <span className="flex-1 text-white/80">📎 {selectedFile.name}</span>
@@ -185,7 +188,8 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="max-w-4xl mx-auto flex items-center">
+          {/* Botón de enviar archivo */}
           <input
             ref={fileInputRef}
             type="file"
@@ -196,13 +200,25 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded text-sm disabled:opacity-50"
+            className="mr-3 px-4 py-3 rounded-2xl bg-[#155DFC] text-white shadow-lg shadow-cyan-500/20 hover:brightness-200 transition disabled:opacity-50"
             title="Adjuntar archivo"
           >
-            📎
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-5 h-5"
+              aria-hidden="true"
+            >
+              <path d="M21.44 11.05 12.25 20.24a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49" />
+            </svg>
           </button>
           <input
-            className="flex-1 p-2 rounded bg-transparent border border-white/5 text-white"
+            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-white outline-none placeholder:text-slate-500"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -214,12 +230,16 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
             placeholder="Escribe tu mensaje..."
             disabled={uploading}
           />
+          {/* Botón de enviar mensaje */}
           <button
+            className="ml-3 px-4 py-3 rounded-2xl bg-[#155DFC] text-white shadow-lg shadow-cyan-500/20 hover:brightness-200 transition"
             onClick={send}
-            disabled={uploading || (!input.trim() && !selectedFile)}
-            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 rounded disabled:opacity-50"
+            aria-label="Enviar"
+            title="Enviar"
           >
-            {uploading ? 'Subiendo...' : 'Enviar'}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 transform rotate-315">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
           </button>
         </div>
       </div>
