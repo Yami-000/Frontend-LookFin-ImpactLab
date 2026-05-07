@@ -64,31 +64,34 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    // Solo cargar conversaciones cuando el auth esté listo y el usuario esté autenticado
+    if (!authReady || !authUser) return
+
+    // Crear la conversación de bienvenida (siempre)
+    const welcomeId = 'welcome'
+    const botMsg = { id: 'welcome-bot-msg', from: 'bot', text: '¡Hola! Soy LookFin, tu asistente financiero personal. ¿En qué puedo ayudarte hoy?', time: Date.now() }
+    const welcomeConv = { id: welcomeId, title: 'Bienvenido', messages: [botMsg] }
+
+    // Cargar conversaciones del localStorage
     const raw = localStorage.getItem(STORAGE_CONV)
+    let storedConversations = []
     if (raw) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        setConversations(parsed)
-        setActiveId(parsed[0].id)
-      } else {
-        // create initial conversation with welcome message
-        const id = Date.now().toString()
-        const botMsg = { id: Date.now().toString() + '-bot', from: 'bot', text: '¡Hola! Soy LookFin, tu asistente financiero personal. ¿En qué puedo ayudarte hoy?', time: Date.now() }
-        const conv = { id, title: 'Bienvenido', messages: [botMsg] }
-        setConversations([conv])
-        setActiveId(id)
+        // Filtrar la conversación de bienvenida si existe en el historial
+        storedConversations = parsed.filter(conv => conv.id !== welcomeId)
       }
-    } else {
-      // no stored conversations -> create initial one
-      const id = Date.now().toString()
-      const botMsg = { id: Date.now().toString() + '-bot', from: 'bot', text: '¡Hola! Soy LookFin, tu asistente financiero personal. ¿En qué puedo ayudarte hoy?', time: Date.now() }
-      const conv = { id, title: 'Bienvenido', messages: [botMsg] }
-      setConversations([conv])
-      setActiveId(id)
     }
+
+    // Agregar la conversación de bienvenida al inicio
+    setConversations([welcomeConv, ...storedConversations])
+
+    // Seleccionar la conversación de bienvenida
+    setActiveId(welcomeId)
+
     const p = localStorage.getItem(STORAGE_PROFILE)
     if (p) setProfile(JSON.parse(p))
-  }, [])
+  }, [authReady, authUser])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_CONV, JSON.stringify(conversations))
@@ -162,7 +165,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#050816]">
+    <div className="h-screen overflow-hidden flex flex-col bg-[#050816]">
       <Header
         onMenu={() => setSidebarOpen((s) => !s)}
         onProfile={() => setProfileOpen(true)}
@@ -171,7 +174,7 @@ export default function App() {
         user={authUser}
       />
 
-      <div className="flex-1 relative flex">
+      <div className="flex-1 relative flex overflow-hidden">
         <Sidebar open={sidebarOpen} conversations={conversations} onCreate={() => addConversation()} onSelect={(id) => setActiveId(id)} onClose={() => setSidebarOpen(false)} />
         <Chat conversation={activeConv} onCreateConversation={addConversation} onUpdateConversation={updateConversation} />
       </div>

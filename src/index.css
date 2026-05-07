@@ -8,3 +8,28 @@
 .hide-scrollbar::-webkit-scrollbar {
 	display: none; /* Chrome, Safari and Opera */
 }
+
+/* Custom scrollbar for chat messages */
+.custom-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: #1f2937 #050816;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+	width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+	background: #050816;
+	border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background: #374151;
+	border-radius: 4px;
+	border: 2px solid #050816;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: #4b5563;
+}

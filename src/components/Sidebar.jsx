@@ -34,7 +34,7 @@ export default function Sidebar({ open, conversations, onCreate, onSelect, onClo
   }
 
   const getChatPreview = (conversation) => {
-    const userMessage = [...(conversation.messages || [])].reverse().find((message) => message.from === 'user')
+    const userMessage = (conversation.messages || []).find((message) => message.from === 'user')
     const previewSource = userMessage?.text || conversation.messages?.[conversation.messages.length - 1]?.text || conversation.title || 'Conversación'
     return previewSource.trim().split(/\s+/).slice(0, 5).join(' ')
   }

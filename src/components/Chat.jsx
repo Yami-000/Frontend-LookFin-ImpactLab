@@ -205,11 +205,11 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
   }
 
   return (
-    <main className="flex-1 flex flex-col">
+    <main className="flex-1 flex flex-col overflow-hidden">
       {!conversation ? (
         <div className="flex-1 flex items-center justify-center text-white/60">Selecciona o crea una conversación desde la izquierda.</div>
       ) : (
-        <div ref={wrapperRef} className="flex-1 p-3 overflow-auto space-y-3">
+        <div ref={wrapperRef} className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
           <div className={`max-w-4xl mx-auto min-h-full flex flex-col ${conversation.messages.length === 1 && conversation.messages[0].from === 'bot' ? 'justify-center items-center' : 'justify-start items-stretch'} gap-6`}>
             {/* Show welcome banner if conversation currently only has the initial bot message */}
             {conversation.messages.length === 1 && conversation.messages[0].from === 'bot' && (
@@ -270,7 +270,7 @@ export default function Chat({ conversation, onCreateConversation, onUpdateConve
         </div>
       )}
 
-      <div className="p-6 border-t border-white/5 bg-[#050816]/40 backdrop-blur-sm">
+      <div className="shrink-0 p-6 border-t border-white/5 bg-[#050816]/40 backdrop-blur-sm">
         {selectedFile && (
           <div className="flex items-center gap-2 bg-white/10 p-2 rounded text-sm">
             <span className="flex-1 text-white/80">📎 {selectedFile.name}</span>
